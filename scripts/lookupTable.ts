@@ -1,5 +1,6 @@
 import {
   AddressLookupTableProgram,
+  clusterApiUrl,
   Connection,
   Keypair,
   LAMPORTS_PER_SOL,
@@ -9,6 +10,16 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
+import * as anchor from "@coral-xyz/anchor";
+import { initSdk } from "./config";
+import { TokenInfo } from "./type";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import SwapPoolIDL from "../target/idl/swap_pool.json";
+import { SwapPool } from "../target/types/swap_pool";
+import { tokens } from "./token";
+import { payer } from "./wallet";
+import { sleep } from "@raydium-io/raydium-sdk-v2";
+const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
 export async function createAndSendV0Tx(
   connection: Connection,
@@ -138,3 +149,84 @@ export async function compareTxSize(
   transactionWithoutLookupTable.sign([signer]);
   console.log("   ✅ - Compiled Transactions");
 }
+const swapPoolProgram = new anchor.Program(SwapPoolIDL as SwapPool, {
+  connection: connection,
+});
+
+async function main(tokensInfo: TokenInfo[]) {
+  const raydium = await initSdk();
+  const lookupTableAddress = new PublicKey(
+    "FFnNLnvHcUxuYCvBAjtj33Yt9xmMAsHZgwnRB6WwJhqS"
+  );
+
+  for (let tokenInfo of tokensInfo) {
+    console.log("Processing token: ", tokenInfo.name);
+    const data = await raydium.liquidity.getPoolInfoFromRpc({
+      poolId: tokenInfo.ammId,
+    });
+
+    const poolKeys = data.poolKeys;
+
+    const accountKeys = [
+      new PublicKey(tokenInfo.ammId),
+      new PublicKey(poolKeys.authority),
+      new PublicKey(poolKeys.openOrders),
+      new PublicKey(poolKeys.vault.A),
+      new PublicKey(poolKeys.vault.B),
+      new PublicKey(poolKeys.marketProgramId),
+      new PublicKey(poolKeys.marketId),
+      new PublicKey(poolKeys.marketBids),
+      new PublicKey(poolKeys.marketAsks),
+      new PublicKey(poolKeys.marketEventQueue),
+      new PublicKey(poolKeys.marketBaseVault),
+      new PublicKey(poolKeys.marketQuoteVault),
+      new PublicKey(poolKeys.marketAuthority),
+      new PublicKey(poolKeys.programId),
+      SystemProgram.programId,
+      swapPoolProgram.programId,
+      TOKEN_PROGRAM_ID,
+    ];
+
+    // Get current addresses in the lookup table
+    const lookupTableAccount = await connection.getAddressLookupTable(
+      lookupTableAddress
+    );
+
+    if (!lookupTableAccount.value) {
+      console.error("Lookup table not found!");
+      return;
+    }
+
+    for(let address of lookupTableAccount.value.state.addresses) {
+        console.log('address: ', address.toString())
+    }
+
+    const currentAddresses = new Set(
+      lookupTableAccount.value.state.addresses.map((address) =>
+        address.toBase58()
+      )
+    );
+
+    const missingAddresses = accountKeys.filter(
+      (key) => !currentAddresses.has(key.toBase58())
+    );
+
+    // Add missing addresses to the lookup table
+    if (missingAddresses.length > 0) {
+      await addAddressesToTable(
+        connection,
+        payer,
+        lookupTableAddress,
+        missingAddresses
+      );
+      console.log(`Added missing addresses for ${tokenInfo.name}`);
+    } else {
+      console.log(`No missing addresses for ${tokenInfo.name}`);
+    }
+
+    // Optional: sleep between requests to avoid rate limits
+    await sleep(1000);
+  }
+}
+
+// main(tokens.slice(0,1));

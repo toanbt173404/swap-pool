@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
+import { TokenInfo } from "./type";
 
-export const tokens = [
+export const tokens: TokenInfo[] = [
   {
     name: "USDC",
     mint: "5QiDKfdEHAqAMEDMEs48izW8WFKdGnMA3BmoHrQgyhcw",
