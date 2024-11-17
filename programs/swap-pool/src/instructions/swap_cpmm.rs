@@ -8,7 +8,7 @@ use raydium_cp_swap::{
 };
 
 #[derive(Accounts)]
-pub struct SwapCtx<'info> {
+pub struct SwapCPMM<'info> {
     pub payer: Signer<'info>,
 
     /// CHECK: pool vault and lp mint authority
@@ -69,7 +69,7 @@ pub struct SwapCtx<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn swap(ctx: Context<SwapCtx>, amount_in: u64, minimum_amount_out: u64) -> Result<()> {
+pub fn swap_cpmm(ctx: Context<SwapCPMM>, amount_in: u64, minimum_amount_out: u64) -> Result<()> {
     let cpi_accounts = cpi::accounts::Swap {
         payer: ctx.accounts.payer.to_account_info(),
         authority: ctx.accounts.authority.to_account_info(),

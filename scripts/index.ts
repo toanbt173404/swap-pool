@@ -27,12 +27,114 @@ import { initSdk } from "./config";
 import { payer } from "./wallet";
 import { BN } from "bn.js";
 import { addAddressesToTable, createLookupTable } from "./lookupTable";
+import {
+  AmmRpcData,
+  AmmV4Keys,
+  ApiV3PoolInfoStandardItem,
+  sleep,
+} from "@raydium-io/raydium-sdk-v2";
+
+const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+const swapPoolProgram = new anchor.Program(SwapPoolIDL as SwapPool, {
+  connection: connection,
+});
 
 const raydiumDevnet = {
   cpmmAddress: new PublicKey("CPMDWBwJDtYax9qW7AyRuVC19Cc4L4Vcy4n2BHAbHkCW"),
   ammConfig: new PublicKey("9zSzfkYy6awexsHvmggeH36pfVUdDGyCcwmjT3AQPBj6"),
   authority: new PublicKey("7rQ1QFNosMkUCuh7Z7fPbTHvh73b68sQYdirycEzJVuw"),
 };
+
+async function swapAmm(inputMint: PublicKey, amountIn: number, minimumAmountOut: number) {
+  const raydium = await initSdk();
+  const ammId = "AkudHW16bjPc1bB7N5L6GHQGKt9Z3oG9iHJj48tLWS5g";
+
+  let poolKeys: AmmV4Keys | undefined;
+
+  const data = await raydium.liquidity.getPoolInfoFromRpc({ poolId: ammId });
+  poolKeys = data.poolKeys;
+
+  const baseIn = inputMint.toString() === poolKeys.mintA.address;
+
+  const [mintIn, mintOut] = baseIn ? [poolKeys.mintA.address, poolKeys.mintB.address] : [poolKeys.mintB.address, poolKeys.mintA.address]
+  
+  const inputTokenAccount = getAssociatedTokenAddressSync(
+    new PublicKey(mintIn),
+    payer.publicKey,
+    false,
+  );
+
+  const outputTokenAccount = await getOrCreateAssociatedTokenAccount(
+    connection,
+    payer,
+    new PublicKey(mintOut),
+    payer.publicKey,
+    false
+  );
+
+  const tx = new Transaction();
+
+  if (inputMint == NATIVE_MINT) {
+    let wrappedSolIx = await wrappedSOLInstruction(payer.publicKey, amountIn);
+    tx.instructions.push(...wrappedSolIx);
+  }
+
+  const swapAmmIx = await swapPoolProgram.methods
+    .swapAmm(new BN(amountIn), new BN(minimumAmountOut))
+    .accountsPartial({
+      amm: new PublicKey(ammId),
+      ammAuthority: new PublicKey(poolKeys.authority),
+      ammOpenOrders: new PublicKey(poolKeys.openOrders),
+      ammCoinVault: new PublicKey(poolKeys.vault.A),
+      ammPcVault: new PublicKey(poolKeys.vault.B),
+      marketProgram: new PublicKey(poolKeys.marketProgramId),
+      market: new PublicKey(poolKeys.marketId),
+      marketBids: new PublicKey(poolKeys.marketBids),
+      marketAsks: new PublicKey(poolKeys.marketAsks),
+      marketEventQueue: new PublicKey(poolKeys.marketEventQueue),
+      marketCoinVault: new PublicKey(poolKeys.marketBaseVault),
+      marketPcVault: new PublicKey(poolKeys.marketQuoteVault),
+      marketVaultSigner: new PublicKey(poolKeys.marketAuthority),
+      ammProgram: new PublicKey(poolKeys.programId),
+      userTokenSource: inputTokenAccount,
+      userTokenDestination: outputTokenAccount.address,
+      userSourceOwner: payer.publicKey,
+    }).instruction();
+
+  const accountKeys = [
+    new PublicKey(ammId),
+    new PublicKey(poolKeys.authority),
+    new PublicKey(poolKeys.openOrders),
+    new PublicKey(poolKeys.vault.A),
+    new PublicKey(poolKeys.vault.B),
+    new PublicKey(poolKeys.marketProgramId),
+    new PublicKey(poolKeys.marketId),
+    new PublicKey(poolKeys.marketBids),
+    new PublicKey(poolKeys.marketAsks),
+    new PublicKey(poolKeys.marketEventQueue),
+    new PublicKey(poolKeys.marketBaseVault),
+    new PublicKey(poolKeys.marketQuoteVault),
+    new PublicKey(poolKeys.marketAuthority),
+    new PublicKey(poolKeys.programId)
+  ];
+
+  //const lookupTableAddress = await createLookupTable(connection, payer);
+  const lookupTableAddress = new PublicKey('JCU9StPNEh3ojTMDZQYxM3SPG7ABTy4LBUecgpqhCzZn')
+  // await addAddressesToTable(connection, payer, lookupTableAddress, accountKeys);
+  console.log(`Lookup Table Address: ${lookupTableAddress}`);
+
+  const lookupTables = [];
+  const lut = (await connection.getAddressLookupTable(lookupTableAddress))
+    .value;
+  lookupTables.push(lut);
+
+  tx.instructions.push(swapAmmIx);
+
+  await finalizeTransaction(connection, payer, tx, lookupTables);
+}
+
+swapAmm(NATIVE_MINT, 0.1 * LAMPORTS_PER_SOL, 0);
 
 async function main() {
   const raydium = await initSdk();
@@ -43,12 +145,10 @@ async function main() {
   const poolInfo = res[poolState];
 
   const inputToken = NATIVE_MINT; //WSOL
-  
+
   const outputToken = new PublicKey(
     "DfZ5GjSXWcYVWLTgk1QRD7kx3u8FmKMNErUPsa8JPPdo"
   ); //DONE
-
-  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
   const swapPoolProgram = new anchor.Program(SwapPoolIDL as SwapPool, {
     connection: connection,
@@ -81,7 +181,7 @@ async function main() {
   }
 
   const swapIx = await swapPoolProgram.methods
-    .swap(new BN(amountIn), minimumAmountOut)
+    .swapCpmm(new BN(amountIn), minimumAmountOut)
     .accountsPartial({
       payer: payer.publicKey,
       authority: raydiumDevnet.authority,
@@ -98,6 +198,7 @@ async function main() {
       observationState: poolInfo.observationId,
     })
     .instruction();
+
   const accountKeys = [
     raydiumDevnet.authority,
     poolInfo.configId,
@@ -113,7 +214,9 @@ async function main() {
   ];
 
   // const lookupTableAddress = await createLookupTable(connection, payer);
-  const lookupTableAddress = new PublicKey('4iPUjdYf4v4JfpSPruj6aZfecCuqJiE6fjFwVLK3ZDcL');
+  const lookupTableAddress = new PublicKey(
+    "4iPUjdYf4v4JfpSPruj6aZfecCuqJiE6fjFwVLK3ZDcL"
+  );
   await addAddressesToTable(connection, payer, lookupTableAddress, accountKeys);
   console.log(`Lookup Table created for at: ${lookupTableAddress}`);
 
@@ -184,4 +287,4 @@ async function wrappedSOLInstruction(recipient: PublicKey, amount: number) {
   return instructions;
 }
 
-main();
+// main();

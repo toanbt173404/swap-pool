@@ -8,8 +8,8 @@ describe("swap-pool", () => {
 
   const program = anchor.workspace.SwapPool as Program<SwapPool>;
 
-  it("Is initialized!", async () => {
-    const tx = await program.methods.initialize().accountsPartial({}).rpc();
-    console.log("Your transaction signature", tx);
-  });
+  // it("Is initialized!", async () => {
+  //   const tx = await program.methods.initialize().accountsPartial({}).rpc();
+  //   console.log("Your transaction signature", tx);
+  // });
 });
