@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-swap_pool = "6J3GbvoEFVZwwXyJWTnHx4uDbUevc4sfF2wRGbb4MeFP"
+swap_pool = "EJrHGZZxpQY1vwBwqmmMfqPv15shTfMLA9XZJr18wg3u"
 
 [registry]
 url = "https://api.apr.dev"

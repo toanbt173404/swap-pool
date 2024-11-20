@@ -1,11 +1,13 @@
 import * as anchor from "@coral-xyz/anchor";
-import SwapPoolIDL from "../target/idl/swap_pool.json";
+import * as idl from "../../target/idl/swap_pool.json";
+import SwapPoolIDL from "../../target/idl/swap_pool.json";
 
-import { SwapPool } from "../target/types/swap_pool";
+import { SwapPool } from "../../target/types/swap_pool";
 import {
   AddressLookupTableAccount,
   clusterApiUrl,
   Connection,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   Transaction,
@@ -17,18 +19,18 @@ import {
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 
-import { initSdk } from "./config";
-import { payer } from "./wallet";
+import { initSdk } from "../config";
+import { payer } from "../wallet";
 import { BN } from "bn.js";
-import { addAddressesToTable, createLookupTable } from "./lookupTable";
-import { finalizeTransaction, wrappedSOLInstruction } from "./utils";
-import { TokenInfo } from "./type";
+import { addAddressesToTable, createLookupTable } from "../lookupTable";
+import { finalizeTransaction, wrappedSOLInstruction } from "../utils";
+import { TokenInfo } from "../type";
+import { SwapPoolProgram } from "../../sdk/swap-pool-program";
+import { tokens } from "../token";
 
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
-const swapPoolProgram = new anchor.Program(SwapPoolIDL as SwapPool, {
-  connection: connection,
-});
+const swapPoolProgram = new SwapPoolProgram(idl as SwapPool, connection);
 
 export async function swapAmm(
   tokensInfo: TokenInfo[],
@@ -72,14 +74,13 @@ export async function swapAmm(
   //   if (lookupTables.length === 0) {
   //     throw new Error("No valid lookup tables found for transaction.");
   //   }
-
   await finalizeTransaction(connection, payer, tx, [lookupTable]);
 }
 
 async function processTokenSwap(
   connection: Connection,
   raydium: any,
-  swapPoolProgram: anchor.Program<SwapPool>,
+  swapPoolProgram: SwapPoolProgram,
   payer: any,
   tokenInfo: TokenInfo,
   inputMint: PublicKey,
@@ -114,8 +115,8 @@ async function processTokenSwap(
       connection,
       payer,
       new PublicKey(mintOut),
-      payer.publicKey,
-      false
+      swapPoolProgram.configPDA,
+      true
     );
 
     if (inputMint.equals(NATIVE_MINT)) {
@@ -126,9 +127,10 @@ async function processTokenSwap(
       txInstructions.push(...wrappedSolIx);
     }
 
-    const swapAmmIx = await swapPoolProgram.methods
+    const swapAmmIx = await swapPoolProgram.program.methods
       .swapAmm(new BN(amountIn), new BN(minimumAmountOut))
       .accountsPartial({
+        userSourceOwner: payer.publicKey,
         amm: new PublicKey(tokenInfo.ammId),
         ammAuthority: new PublicKey(poolKeys.authority),
         ammOpenOrders: new PublicKey(poolKeys.openOrders),
@@ -145,7 +147,6 @@ async function processTokenSwap(
         ammProgram: new PublicKey(poolKeys.programId),
         userTokenSource: inputTokenAccount,
         vaultTokenAccount: outputTokenAccount.address,
-        userSourceOwner: payer.publicKey,
       })
       .instruction();
 
@@ -165,7 +166,7 @@ async function processTokenSwap(
       new PublicKey(poolKeys.marketAuthority),
       new PublicKey(poolKeys.programId),
       SystemProgram.programId,
-      swapPoolProgram.programId,
+      swapPoolProgram.program.programId,
       TOKEN_PROGRAM_ID,
     ];
 
@@ -187,3 +188,9 @@ async function processTokenSwap(
 
   return { instructions: txInstructions, lookupTable };
 }
+
+
+const amountIn = 0.1 * LAMPORTS_PER_SOL;
+const minAmountOut = 0;
+
+swapAmm(tokens.slice(0, 4), NATIVE_MINT, amountIn, minAmountOut);

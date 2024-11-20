@@ -1,61 +1,72 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::Token;
+use anchor_spl::token::{Token, TokenAccount};
 
 use raydium_amm_cpi::*;
 
+use crate::ConfigAccount;
+
 #[derive(Accounts)]
 pub struct SwapAMM<'info> {
-    /// CHECK: Safe. amm Account
-    #[account(mut)]
-    pub amm: UncheckedAccount<'info>,
-    /// CHECK: Safe. Amm authority Account
-    #[account(mut)]
-    pub amm_authority: UncheckedAccount<'info>,
-    /// CHECK: Safe. amm open_orders Account
-    #[account(mut)]
-    pub amm_open_orders: UncheckedAccount<'info>,
-    /// CHECK: Safe. amm_coin_vault Amm Account to swap FROM or To,
-    #[account(mut)]
-    pub amm_coin_vault: UncheckedAccount<'info>,
-    /// CHECK: Safe. amm_pc_vault Amm Account to swap FROM or To,
-    #[account(mut)]
-    pub amm_pc_vault: UncheckedAccount<'info>,
-    /// CHECK: Safe.OpenBook program id
-    pub market_program: UncheckedAccount<'info>,
-    /// CHECK: Safe. OpenBook market Account. OpenBook program is the owner.
-    #[account(mut)]
-    pub market: UncheckedAccount<'info>,
-    /// CHECK: Safe. bids Account
-    #[account(mut)]
-    pub market_bids: UncheckedAccount<'info>,
-    /// CHECK: Safe. asks Account
-    #[account(mut)]
-    pub market_asks: UncheckedAccount<'info>,
-    /// CHECK: Safe. event_q Account
-    #[account(mut)]
-    pub market_event_queue: UncheckedAccount<'info>,
-    /// CHECK: Safe. coin_vault Account
-    #[account(mut)]
-    pub market_coin_vault: UncheckedAccount<'info>,
-    /// CHECK: Safe. pc_vault Account
-    #[account(mut)]
-    pub market_pc_vault: UncheckedAccount<'info>,
-    /// CHECK: Safe. vault_signer Account
-    #[account(mut)]
-    pub market_vault_signer: UncheckedAccount<'info>,
-    /// CHECK: Safe. user source token Account. user Account to swap from.
-    #[account(mut)]
-    pub user_token_source: UncheckedAccount<'info>,
-    /// CHECK: Safe. user destination token Account. user Account to swap to.
-    #[account(mut)]
-    pub user_token_destination: UncheckedAccount<'info>,
     /// CHECK: Safe. user owner Account
     #[account(mut)]
     pub user_source_owner: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"config".as_ref()],
+        bump
+    )]
+    pub config_account: Account<'info, ConfigAccount>,
+    /// CHECK: Safe. amm Account
+    #[account(mut)]
+    pub amm: AccountInfo<'info>,
+    /// CHECK: Safe. Amm authority Account
+    #[account(mut)]
+    pub amm_authority: AccountInfo<'info>,
+    /// CHECK: Safe. amm open_orders Account
+    #[account(mut)]
+    pub amm_open_orders: AccountInfo<'info>,
+    /// CHECK: Safe. amm_coin_vault Amm Account to swap FROM or To,
+    #[account(mut)]
+    pub amm_coin_vault: AccountInfo<'info>,
+    /// CHECK: Safe. amm_pc_vault Amm Account to swap FROM or To,
+    #[account(mut)]
+    pub amm_pc_vault: AccountInfo<'info>,
+    /// CHECK: Safe.OpenBook program id
+    pub market_program: AccountInfo<'info>,
+    /// CHECK: Safe. OpenBook market Account. OpenBook program is the owner.
+    #[account(mut)]
+    pub market: AccountInfo<'info>,
+    /// CHECK: Safe. bids Account
+    #[account(mut)]
+    pub market_bids: AccountInfo<'info>,
+    /// CHECK: Safe. asks Account
+    #[account(mut)]
+    pub market_asks: AccountInfo<'info>,
+    /// CHECK: Safe. event_q Account
+    #[account(mut)]
+    pub market_event_queue: AccountInfo<'info>,
+    /// CHECK: Safe. coin_vault Account
+    #[account(mut)]
+    pub market_coin_vault: AccountInfo<'info>,
+    /// CHECK: Safe. pc_vault Account
+    #[account(mut)]
+    pub market_pc_vault: AccountInfo<'info>,
+    /// CHECK: Safe. vault_signer Account
+    #[account(mut)]
+    pub market_vault_signer: AccountInfo<'info>,
+    /// CHECK: Safe. user source token Account. user Account to swap from.
+    #[account(mut)]
+    pub user_token_source: AccountInfo<'info>,
+    /// CHECK: Safe. user destination token Account. user Account to swap to.
+    #[account(
+        mut,
+        owner = config_account.key()
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
     /// CHECK: Safe. The spl token program
     pub token_program: Program<'info, Token>,
     /// CHECK: Safe. amm_program
-    pub amm_program: UncheckedAccount<'info>,
+    pub amm_program: AccountInfo<'info>,
 }
 
 pub fn swap_amm(ctx: Context<SwapAMM>, amount_in: u64, minimum_amount_out: u64) -> Result<()> {
@@ -74,7 +85,7 @@ pub fn swap_amm(ctx: Context<SwapAMM>, amount_in: u64, minimum_amount_out: u64) 
         market_pc_vault: ctx.accounts.market_pc_vault.clone(),
         market_vault_signer: ctx.accounts.market_vault_signer.clone(),
         user_token_source: ctx.accounts.user_token_source.clone(),
-        user_token_destination: ctx.accounts.user_token_destination.clone(),
+        user_token_destination: ctx.accounts.vault_token_account.to_account_info(),
         user_source_owner: ctx.accounts.user_source_owner.clone(),
         token_program: ctx.accounts.token_program.clone(),
     };

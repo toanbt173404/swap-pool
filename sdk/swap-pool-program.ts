@@ -17,8 +17,21 @@ export class SwapPoolProgram {
     return new Program(this.idl, { connection: this.connection });
   }
 
-  async swap() {
-    
+  get configPDA(): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("config")],
+      this.program.programId
+    )[0];
   }
- 
+
+  async initialize(admin: PublicKey): Promise<Transaction> {
+    const tx = await this.program.methods
+      .initialize()
+      .accountsPartial({
+        admin: admin,
+        configAccount: this.configPDA,
+      })
+      .transaction();
+    return tx;
+  }
 }

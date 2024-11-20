@@ -5,7 +5,8 @@
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "run-main": "npx ts-node scripts/index.ts",
     "lookup": "npx ts-node scripts/lookupTable.ts",
-    "deploy:devnet": "anchor deploy --program-name swap-pool --provider.cluster https://api.devnet.solana.com"
+    "deploy:devnet": "anchor deploy --program-name swap-pool --provider.cluster https://api.devnet.solana.com",
+    "init-program:devnet": "npx ts-node scripts/swap-pool/initialize.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",
