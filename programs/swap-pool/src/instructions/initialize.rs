@@ -3,7 +3,6 @@ use std::ops::DerefMut;
 
 use crate::ConfigAccount;
 
-
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(mut)]

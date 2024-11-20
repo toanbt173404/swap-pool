@@ -1,17 +1,13 @@
-use std::ops::DerefMut;
-
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    token::{Token, TokenAccount},
-    token_interface::Mint,
-};
+use anchor_spl::token::{Token, TokenAccount};
 
 use raydium_amm_cpi::*;
 
-use crate::{error::SwapPoolError, AssetInfo, ConfigAccount, UserAccount, MAX_ASSETS};
+use crate::ConfigAccount;
 
 #[derive(Accounts)]
-pub struct SwapAMM<'info> {
+pub struct SwapAMMV2<'info> {
+    /// CHECK: Safe. user owner Account
     #[account(mut)]
     pub user_source_owner: Signer<'info>,
     #[account(
@@ -20,16 +16,6 @@ pub struct SwapAMM<'info> {
         bump
     )]
     pub config_account: Account<'info, ConfigAccount>,
-    #[account(
-        init_if_needed,
-        payer = user_source_owner,
-        space = UserAccount::INIT_SPACE,
-        seeds = [b"user".as_ref(), &user_source_owner.key().as_ref()],
-        bump
-    )]
-    pub user_account: Account<'info, UserAccount>,
-    #[account(mut)]
-    pub mint_out: Box<InterfaceAccount<'info, Mint>>,
     /// CHECK: Safe. amm Account
     #[account(mut)]
     pub amm: AccountInfo<'info>,
@@ -74,22 +60,16 @@ pub struct SwapAMM<'info> {
     /// CHECK: Safe. user destination token Account. user Account to swap to.
     #[account(
         mut,
-        constraint = vault_token_account.owner == user_account.key(),
-        constraint = vault_token_account.mint == mint_out.key()
+        constraint = vault_token_account.owner == config_account.key()
     )]
     pub vault_token_account: Account<'info, TokenAccount>,
     /// CHECK: Safe. The spl token program
     pub token_program: Program<'info, Token>,
     /// CHECK: Safe. amm_program
     pub amm_program: AccountInfo<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
-pub fn swap_amm(ctx: Context<SwapAMM>, amount_in: u64, minimum_amount_out: u64) -> Result<()> {
-    let balance_before = ctx.accounts.vault_token_account.amount;
-    let user_account = ctx.accounts.user_account.deref_mut();
-
+pub fn swap_amm_v2(ctx: Context<SwapAMMV2>, amount_in: u64, minimum_amount_out: u64) -> Result<()> {
     let cpi_accounts = SwapBaseIn {
         amm: ctx.accounts.amm.clone(),
         amm_authority: ctx.accounts.amm_authority.clone(),
@@ -112,32 +92,6 @@ pub fn swap_amm(ctx: Context<SwapAMM>, amount_in: u64, minimum_amount_out: u64) 
 
     let cpi_context = CpiContext::new(ctx.accounts.amm_program.to_account_info(), cpi_accounts);
     raydium_amm_cpi::instructions::swap_base_in(cpi_context, amount_in, minimum_amount_out)?;
-
-    ctx.accounts.vault_token_account.reload()?;
-
-    let balance_change = ctx
-        .accounts
-        .vault_token_account
-        .amount
-        .checked_sub(balance_before)
-        .unwrap();
-
-    if let Some(asset) = user_account
-        .assets_info
-        .iter_mut()
-        .find(|a| a.mint == ctx.accounts.mint_out.key())
-    {
-        asset.amount = asset.amount.checked_add(balance_change).unwrap();
-    } else {
-        if user_account.assets_info.len() < MAX_ASSETS {
-            user_account.assets_info.push(AssetInfo {
-                mint: ctx.accounts.mint_out.key(),
-                amount: balance_change,
-            });
-        } else {
-            return Err(error!(SwapPoolError::MaxAssetsExceeded));
-        }
-    }
 
     Ok(())
 }

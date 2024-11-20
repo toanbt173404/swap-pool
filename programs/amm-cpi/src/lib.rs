@@ -29,7 +29,7 @@ pub mod openbook_program_id {
     anchor_lang::declare_id!("EoTcMgcDRTJVZDMZWBoU6rhYHZfkNTVEAfz3uUJRcYGj");
 }
 
-declare_id!("CPm6itAVp6pF7ofFoXxYd2nFW1gk2z4pmSWQfZeDBP9E");
+declare_id!("CxTU5Qy4v355V5tXcM6xG1opZQHFH2b8QHzsMFSM2Gy1");
 
 /// The AMM program
 #[derive(Clone)]

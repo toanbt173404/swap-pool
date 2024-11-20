@@ -6,7 +6,11 @@
     "run-main": "npx ts-node scripts/index.ts",
     "lookup": "npx ts-node scripts/lookupTable.ts",
     "deploy:devnet": "anchor deploy --program-name swap-pool --provider.cluster https://api.devnet.solana.com",
-    "init-program:devnet": "npx ts-node scripts/swap-pool/initialize.ts"
+    "initialize:devnet": "npx ts-node scripts/swap-pool/initialize.ts",
+    "swap-amm:devnet": "npx ts-node scripts/swap-pool/swapAmm.ts",
+    "swap-amm-v2:devnet": "npx ts-node scripts/swap-pool/swapAmmV2.ts"
+
+
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",

@@ -1,11 +1,12 @@
-import { BN, IdlAccounts, IdlTypes, Program } from "@coral-xyz/anchor";
-import { Connection, PublicKey, Transaction, Keypair } from "@solana/web3.js";
+import { BN, IdlAccounts, Instruction, Program } from "@coral-xyz/anchor";
+import { Connection, PublicKey, Transaction, Keypair, TransactionInstruction } from "@solana/web3.js";
 import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { SwapPool } from "../target/types/swap_pool";
+
+export type UserData = IdlAccounts<SwapPool>["userAccount"];
 
 export class SwapPoolProgram {
   constructor(
@@ -24,6 +25,20 @@ export class SwapPoolProgram {
     )[0];
   }
 
+  userPDA(userPubkey: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("user"), userPubkey.toBuffer()],
+      this.program.programId
+    )[0];
+  }
+
+  async getUserData(userPubkey: PublicKey): Promise<UserData> {
+    const userData = await this.program.account.userAccount.fetch(
+      this.userPDA(userPubkey)
+    );
+    return userData;
+  }
+
   async initialize(admin: PublicKey): Promise<Transaction> {
     const tx = await this.program.methods
       .initialize()
@@ -32,6 +47,36 @@ export class SwapPoolProgram {
         configAccount: this.configPDA,
       })
       .transaction();
+    return tx;
+  }
+
+  async withdrawAsset(
+    userPubkey: PublicKey,
+    mint: PublicKey,
+    amount: BN
+  ): Promise<TransactionInstruction> {
+    const userAccount = this.userPDA(userPubkey);
+
+    const userTokenAccount = getAssociatedTokenAddressSync(mint, userPubkey);
+
+    const vaultTokenAccount = getAssociatedTokenAddressSync(
+      mint,
+      userAccount,
+      true
+    );
+
+    const tx = await this.program.methods
+      .withdrawAsset(amount)
+      .accountsPartial({
+        user: userPubkey,
+        configAccount: this.configPDA,
+        userAccount: userAccount,
+        userTokenAccount: userTokenAccount,
+        vaultTokenAccount: vaultTokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        ammProgram: TOKEN_PROGRAM_ID
+      })
+      .instruction();
     return tx;
   }
 }

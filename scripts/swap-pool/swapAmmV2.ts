@@ -15,6 +15,7 @@ import {
   NATIVE_MINT,
   getOrCreateAssociatedTokenAccount,
   TOKEN_PROGRAM_ID,
+  getAccount,
 } from "@solana/spl-token";
 
 import { initSdk } from "../config";
@@ -30,7 +31,7 @@ const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
 const swapPoolProgram = new SwapPoolProgram(idl as SwapPool, connection);
 
-export async function swapAmm(
+export async function swapAmmV2(
   tokensInfo: TokenInfo[],
   inputMint: PublicKey,
   amountIn: number,
@@ -69,9 +70,6 @@ export async function swapAmm(
     // }
   }
 
-  //   if (lookupTables.length === 0) {
-  //     throw new Error("No valid lookup tables found for transaction.");
-  //   }
   await finalizeTransaction(connection, payer, tx, [lookupTable]);
 }
 
@@ -109,14 +107,20 @@ async function processTokenSwap(
       false
     );
 
+    console.log("poolKeys: ", poolKeys);
+
     const outputTokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
       payer,
       new PublicKey(mintOut),
-      swapPoolProgram.userPDA(payer.publicKey),
+      swapPoolProgram.configPDA,
       true
     );
 
+    const vaultTokenInfo = await getAccount(
+      connection,
+      outputTokenAccount.address
+    );
     if (inputMint.equals(NATIVE_MINT)) {
       const wrappedSolIx = await wrappedSOLInstruction(
         payer.publicKey,
@@ -125,13 +129,10 @@ async function processTokenSwap(
       txInstructions.push(...wrappedSolIx);
     }
 
-    const swapAmmIx = await swapPoolProgram.program.methods
-      .swapAmm(new BN(amountIn), new BN(minimumAmountOut))
+    const swapAmmV2Ix = await swapPoolProgram.program.methods
+      .swapAmmV2(new BN(amountIn), new BN(minimumAmountOut))
       .accountsPartial({
         userSourceOwner: payer.publicKey,
-        configAccount: swapPoolProgram.configPDA,
-        userAccount: swapPoolProgram.userPDA(payer.publicKey),
-        mintOut: new PublicKey(mintOut),
         amm: new PublicKey(tokenInfo.ammId),
         ammAuthority: new PublicKey(poolKeys.authority),
         ammOpenOrders: new PublicKey(poolKeys.openOrders),
@@ -179,7 +180,7 @@ async function processTokenSwap(
       console.log(`Lookup Table Address: ${lookupTable}`);
     }
 
-    txInstructions.push(swapAmmIx);
+    txInstructions.push(swapAmmV2Ix);
   } catch (error) {
     console.error(
       `Error processing token swap for AMM ID: ${tokenInfo.ammId}`,
@@ -193,3 +194,7 @@ async function processTokenSwap(
 const amountIn = 0.1 * LAMPORTS_PER_SOL;
 const minAmountOut = 0;
 
+swapAmmV2(tokens.slice(0, 4), NATIVE_MINT, amountIn, minAmountOut);
+swapAmmV2(tokens.slice(4, 8), NATIVE_MINT, amountIn, minAmountOut);
+swapAmmV2(tokens.slice(8, 12), NATIVE_MINT, amountIn, minAmountOut);
+swapAmmV2(tokens.slice(12, 16), NATIVE_MINT, amountIn, minAmountOut);
