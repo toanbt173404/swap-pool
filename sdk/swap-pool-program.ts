@@ -74,7 +74,6 @@ export class SwapPoolProgram {
         userTokenAccount: userTokenAccount,
         vaultTokenAccount: vaultTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
-        ammProgram: TOKEN_PROGRAM_ID
       })
       .instruction();
     return tx;

@@ -8,7 +8,8 @@
     "deploy:devnet": "anchor deploy --program-name swap-pool --provider.cluster https://api.devnet.solana.com",
     "initialize:devnet": "npx ts-node scripts/swap-pool/initialize.ts",
     "swap-amm:devnet": "npx ts-node scripts/swap-pool/swapAmm.ts",
-    "swap-amm-v2:devnet": "npx ts-node scripts/swap-pool/swapAmmV2.ts"
+    "swap-amm-v2:devnet": "npx ts-node scripts/swap-pool/swapAmmV2.ts",
+    "swap-base-out:devnet": "npx ts-node scripts/swap-pool/swapBaseOut.ts"
 
 
   },

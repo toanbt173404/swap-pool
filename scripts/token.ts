@@ -2,12 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import { TokenInfo } from "./type";
 
 export const tokens: TokenInfo[] = [
-  {
-    name: "USDC",
-    mint: "5QiDKfdEHAqAMEDMEs48izW8WFKdGnMA3BmoHrQgyhcw",
-    lut: new PublicKey("9681WP1PiAXFJPEfZ36uMAdfVebcCMEe2Zu6rj4th5gA"),
-    ammId: "AkudHW16bjPc1bB7N5L6GHQGKt9Z3oG9iHJj48tLWS5g",
-  },
+
   {
     name: "PNUT",
     mint: "HttRbw6tw8V7BJ8T29HD6GMK1BFKAqM7eXjTfdgPdGtx",
@@ -121,5 +116,11 @@ export const tokens: TokenInfo[] = [
     mint: "FJxwobCwxK3shxC8xERfqSK2h5ddjAZD4Jq3KhxcmZ8W",
     ammId: "A23pAnG9YsXYUSNKAvZUvBhjagoPpoLavVzZBuecEzjB",
     lut: new PublicKey("8nL7EMhcRZmskjd733mmy2vYRZvPmZzKsDRnYSQkv3LJ"),
+  },
+  {
+    name: "USDC",
+    mint: "5QiDKfdEHAqAMEDMEs48izW8WFKdGnMA3BmoHrQgyhcw",
+    lut: new PublicKey("9681WP1PiAXFJPEfZ36uMAdfVebcCMEe2Zu6rj4th5gA"),
+    ammId: "AkudHW16bjPc1bB7N5L6GHQGKt9Z3oG9iHJj48tLWS5g",
   },
 ];

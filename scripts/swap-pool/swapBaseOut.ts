@@ -31,46 +31,29 @@ const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
 const swapPoolProgram = new SwapPoolProgram(idl as SwapPool, connection);
 
-export async function swapAmmV2(
-  tokensInfo: TokenInfo[],
+export async function swapBaseOut(
+  tokenInfo: TokenInfo,
   inputMint: PublicKey,
-  amountIn: number,
-  minimumAmountOut: number
+  maxAmountIn: number,
+  amountOut: number
 ) {
   const raydium = await initSdk();
   const tx = new Transaction();
-  const lookupTables: AddressLookupTableAccount[] = [];
 
-  const lookupTableAddress = new PublicKey(
-    "FFnNLnvHcUxuYCvBAjtj33Yt9xmMAsHZgwnRB6WwJhqS"
+  const { instructions } = await processTokenSwap(
+    connection,
+    raydium,
+    swapPoolProgram,
+    payer,
+    tokenInfo,
+    inputMint,
+    maxAmountIn,
+    amountOut
   );
-  const lookupTable = (
-    await connection.getAddressLookupTable(lookupTableAddress)
-  ).value;
 
-  for (const tokenInfo of tokensInfo) {
-    const { instructions, lookupTable } = await processTokenSwap(
-      connection,
-      raydium,
-      swapPoolProgram,
-      payer,
-      tokenInfo,
-      inputMint,
-      amountIn,
-      minimumAmountOut
-    );
+  tx.instructions.push(...instructions);
 
-    tx.instructions.push(...instructions);
-
-    // if (lookupTable) {
-    //   const lut = (await connection.getAddressLookupTable(lookupTable)).value;
-    //   if (lut) {
-    //     lookupTables.push(lut);
-    //   }
-    // }
-  }
-
-  await finalizeTransaction(connection, payer, tx, [lookupTable]);
+  await finalizeTransaction(connection, payer, tx, []);
 }
 
 async function processTokenSwap(
@@ -80,8 +63,8 @@ async function processTokenSwap(
   payer: any,
   tokenInfo: TokenInfo,
   inputMint: PublicKey,
-  amountIn: number,
-  minimumAmountOut: number
+  maxAmountIn: number,
+  amountOut: number
 ): Promise<{ instructions: any[]; lookupTable: PublicKey | null }> {
   const txInstructions: any[] = [];
   let lookupTable: PublicKey | null = null;
@@ -121,13 +104,13 @@ async function processTokenSwap(
     if (inputMint.equals(NATIVE_MINT)) {
       const wrappedSolIx = await wrappedSOLInstruction(
         payer.publicKey,
-        amountIn
+        maxAmountIn
       );
       txInstructions.push(...wrappedSolIx);
     }
 
     const swapAmmV2Ix = await swapPoolProgram.program.methods
-      .swapAmmV2(new BN(amountIn), new BN(minimumAmountOut))
+      .swapBaseOut(new BN(maxAmountIn), new BN(amountOut))
       .accountsPartial({
         userSourceOwner: payer.publicKey,
         amm: new PublicKey(tokenInfo.ammId),
@@ -188,10 +171,8 @@ async function processTokenSwap(
   return { instructions: txInstructions, lookupTable };
 }
 
-const amountIn = 0.1 * LAMPORTS_PER_SOL;
-const minAmountOut = 0;
+const maxAmountIn = 0.1 * LAMPORTS_PER_SOL;
+const amountOut = 20000000;
 
-swapAmmV2(tokens.slice(0, 4), NATIVE_MINT, amountIn, minAmountOut);
-swapAmmV2(tokens.slice(4, 8), NATIVE_MINT, amountIn, minAmountOut);
-swapAmmV2(tokens.slice(8, 12), NATIVE_MINT, amountIn, minAmountOut);
-swapAmmV2(tokens.slice(12, 16), NATIVE_MINT, amountIn, minAmountOut);
+swapBaseOut(tokens[0], NATIVE_MINT, maxAmountIn, amountOut);
+        

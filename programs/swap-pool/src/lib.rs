@@ -47,4 +47,13 @@ pub mod swap_pool {
         instructions::withdraw_asset(ctx, amount)?;
         Ok(())
     }
+
+    pub fn swap_base_out(
+        ctx: Context<SwapPoolBaseOut>,
+        max_amount_in: u64,
+        amount_out: u64,
+    ) -> Result<()> {
+        instructions::swap_base_out(ctx, max_amount_in, amount_out)?;
+        Ok(())
+    }
 }
